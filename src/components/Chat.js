@@ -5,23 +5,35 @@ const Chat = () => {
   const [msg, setmsg] = useState("");
   const [username, setUsername] = useState(" ");
 
-    const refreshPage = () => {
-      window.location.reload(false);
-    };
 
   const [fullMessage, setFullMessage] = useState([]);
 
   const AllMeesage = async () => {
-    let { data } = await supabase.from("chat table").select("*");
-
+    let { data } = await supabase.from("chat-app").select("*");
     console.log(data);
     setFullMessage(data);
   };
 
-  useEffect(() => {
-    AllMeesage();
-  }, []);
 
+  supabase.channel('custom-all-channel')
+  .on(
+    'postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'chat-app' },
+    (payload) => {
+      console.log('Change received!', payload.new)
+      let newData = [...fullMessage, payload.new]
+      setFullMessage(newData)
+      // setFullMessage(payload.new)
+    }
+  )
+  .subscribe()
+
+  
+    // fetch all data --> insert --> subscribe event  --> update local state
+
+  useEffect(() => {
+    AllMeesage()
+  }, []);
   const sendMessage = async (event) => {
     event.preventDefault();
     if (msg === "") {
@@ -29,13 +41,11 @@ const Chat = () => {
       return;
     }
     await supabase
-      .from("chat table")
+      .from("chat-app")
       .insert({ message: msg, username: username })
       .single()
       .then(({ data, error }) => {
         console.log(data, error);
-        refreshPage();
-        
       });
    
   };
@@ -69,10 +79,9 @@ const Chat = () => {
       <div className="List-view">
           {fullMessage &&
             fullMessage.map((uname) => (
-                <>
-              <div key={uname.id} {...uname} >{uname.username}</div> 
-              <div key={uname.id} {...uname} >{uname.message}</div> 
-              </>
+              <div key={uname.id}>
+                <div  {...uname} >{uname.message}</div> 
+              </div>
             ))}
         </div>
     </>
